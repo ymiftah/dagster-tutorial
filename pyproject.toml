@@ -12,6 +12,7 @@ dev = [
     "dagster-webserver",
     "dagster-dg-cli",
     "ruff>=0.14.3",
+    "pytest>=8.4.2",
 ]
 docker = [
     "dagster-docker>=0.28.0",
