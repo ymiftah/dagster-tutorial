@@ -1,0 +1,26 @@
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+
+# Checkout and install dagster libraries needed to run the gRPC server
+# exposing your repository to dagster-webserver and dagster-daemon, and to load the DagsterInstance
+# Add repository code
+
+WORKDIR /opt/dagster/app
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --group docker
+
+# Copy the project into the image
+COPY . /opt/dagster/app
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
+# Run dagster gRPC server on port 4000
+
+EXPOSE 4000
+
+ENTRYPOINT [ "uv", "run" ]
+
+CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000",\ 
+     "--module-name", "dagster_tutorial.definitions"]
