@@ -1,0 +1,54 @@
+name: Dagster E2E
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build and run containers
+        run: docker-compose up -d --build
+
+      - name: Wait for services to be healthy
+        run: |
+          sleep 30
+          docker-compose ps
+
+      - name: Test webserver health
+        run: |
+          curl -f -s -X POST -H "Content-Type: application/json" --data '{"query": "query { __typename }"}' http://localhost:3000/graphql | grep -q '{"data":{"__typename":"Query"}}'
+
+      - name: Trigger asset materialization
+        id: launch_run
+        run: |
+          RUN_ID=$(curl -s -X POST -H "Content-Type: application/json" \
+            -d '{"query": "mutation { launchRun(runParams: { selector: { assetKeys: [{path: [\"customers\"]}] } }) { __typename ... on LaunchRunSuccess { run { runId } } ... on PythonError { message } } }"}' \
+            http://localhost:3000/graphql | sed -n 's/.*"runId":"\([^"]*\)".*/\1/p')
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: Verify asset materialization status
+        run: |
+          RUN_ID=${{ steps.launch_run.outputs.run_id }}
+          echo "Polling for run_id: $RUN_ID"
+          while true; do
+            STATUS=$(curl -s -X POST -H "Content-Type: application/json" \
+              -d "{\"query\": \"query($runId: ID!) { runOrError(runId: $runId) { __typename ... on Run { status } } }\", \"variables\": {\"runId\": \"$RUN_ID\"}}" \
+              http://localhost:3000/graphql | sed -n 's/.*"status":"\([^"]*\)".*/\1/p')
+            echo "Current status: $STATUS"
+            if [[ "$STATUS" != "STARTING" && "$STATUS" != "STARTED" && "$STATUS" != "QUEUED" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$STATUS" != "SUCCESS" ]]; then
+            echo "Run failed with status: $STATUS"
+            exit 1
+          fi
+          echo "Run succeeded!"
