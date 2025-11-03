@@ -1,5 +1,11 @@
 # dagster_tutorial
 
+This repo is derived from the dagster tutorial, with a spin regarding the use of docker compose for CI.
+
+The templates allow spinning up all the components of dagster into their own container, and adds a service to run tests in CI.
+
+This allows for instance e2e testing scenarios, where a front-end communicates to the dagster services through API calls.
+
 ## Getting started
 
 ### Installing dependencies
