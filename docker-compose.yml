@@ -1,5 +1,3 @@
-version: "3.7"
-
 services:
   # This service runs the postgres DB used by dagster for run storage, schedule storage,
   # and event log storage. Depending on the hardware you run this Compose on, you may be able
@@ -74,6 +72,12 @@ services:
         condition: service_healthy
       docker_example_user_code:
         condition: service_started
+    healthcheck:
+      test: "curl -f http://localhost:3000/ || exit 1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   # This service runs the dagster-daemon process, which is responsible for taking runs
   # off of the queue and launching them, as well as creating runs from schedules or sensors.
@@ -100,6 +104,30 @@ services:
         condition: service_healthy
       docker_example_user_code:
         condition: service_started
+
+  
+  # Test service
+  docker_test_service:
+    build:
+      context: .
+      dockerfile: ./Dockerfile_user_code
+    container_name: docker_example_test_service
+    image: docker_test_image
+    restart: on-failure
+    environment:
+      IS_CI: "True"
+      WEBSERVER_NAME: "docker_example_webserver"
+      WEBSERVER_PORT: "3000"
+    depends_on:
+      docker_example_postgresql:
+        condition: service_healthy
+      docker_example_user_code:
+        condition: service_started
+      docker_example_webserver:
+        condition: service_healthy
+    networks:
+      - docker_example_network
+    command: "echo test" # The default command for this container will be to run pytest
 
 networks:
   docker_example_network:
