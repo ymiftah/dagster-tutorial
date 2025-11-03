@@ -23,6 +23,6 @@ jobs:
             docker_example_user_code
             docker_example_postgresql
 
-      - name: Wait for services to be healthy
+      - name: Run test service
         run: |
            docker compose run --rm docker_test_service uv run pytest
